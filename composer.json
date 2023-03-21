@@ -1,0 +1,42 @@
+{
+    "name": "backpack/generators",
+    "description": "Generate files for laravel projects",
+    "keywords": [
+        "generators",
+        "model",
+        "view",
+        "request",
+        "config"
+    ],
+    "require": {
+        "cloudy4next/CRUD": "master"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url":  "git@github.com:cloudy4next/CRUD.git",
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit" : "^9.0||^7.0",
+        "scrutinizer/ocular": "~1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Backpack\\Generators\\": "src"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit --testdox"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Backpack\\Generators\\GeneratorsServiceProvider"
+            ]
+        }
+    }
+}
