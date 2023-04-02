@@ -1,5 +1,5 @@
 {
-    "name": "cloudy4next/generators",
+    "name": "backpack/generators",
     "description": "Generate files for laravel projects",
     "keywords": [
         "generators",
@@ -8,13 +8,14 @@
         "request",
         "config"
     ],
-    "require": {
-        "cloudy4next/CRUD": "master"
-    },
-    "repositories": [
+    "homepage": "https://github.com/laravel-backpack/generators",
+    "license": "proprietary",
+    "authors": [
         {
-            "type": "vcs",
-            "url":  "git@github.com:cloudy4next/crud.git"
+            "name": "Cristian Tone",
+            "email": "cristitone@outlook.com",
+            "homepage": "http://updivision.com",
+            "role": "Developer"
         }
     ],
     "require-dev": {
