@@ -2,11 +2,13 @@
 
 namespace Backpack\Generators\Console\Commands;
 
-use Illuminate\Console\GeneratorCommand;
+use Backpack\Generators\Services\BackpackCommand;
 use Illuminate\Support\Str;
 
-class CrudModelBackpackCommand extends GeneratorCommand
+class CrudModelBackpackCommand extends BackpackCommand
 {
+    use \Backpack\CRUD\app\Console\Commands\Traits\PrettyCommandOutput;
+
     /**
      * The console command name.
      *
@@ -51,71 +53,89 @@ class CrudModelBackpackCommand extends GeneratorCommand
      */
     public function handle()
     {
-        $name = $this->qualifyClass($this->getNameInput());
+        $name = $this->getNameInput();
+        $nameTitle = $this->buildCamelName($name);
+        $namespaceApp = $this->qualifyClass($nameTitle);
+        $namespaceModels = $this->qualifyClass('/Models/'.$nameTitle);
+        $relativePath = $this->buildRelativePath($namespaceModels);
 
-        $path = $this->getPath($name);
+        $this->progressBlock("Creating Model <fg=blue>$relativePath</>");
 
-        // First we will check to see if the class already exists. If it does, we don't want
-        // to create the class and overwrite the user's code. We just make sure it uses CrudTrait
-        // We add that one line. Otherwise, we will continue generating this class' files.
-        if ((! $this->hasOption('force') ||
-             ! $this->option('force')) &&
-             $this->alreadyExists($this->getNameInput())) {
-            $file = $this->files->get($path);
-            $file_array = explode(PHP_EOL, $file);
+        // Check if exists on app or models
+        $existsOnApp = $this->alreadyExists($namespaceApp);
+        $existsOnModels = $this->alreadyExists($namespaceModels);
 
-            // check if it already uses CrudTrait
-            // if it does, do nothing
-            if (Str::contains($file, [$this->crudTrait])) {
-                $this->info('Model already exists and uses CrudTrait.');
+        // If no model was found, we will generate the path to the location where this class file
+        // should be written. Then, we will build the class and make the proper replacements on
+        // the stub files so that it gets the correctly formatted namespace and class name.
+        if (! $existsOnApp && ! $existsOnModels) {
+            $this->makeDirectory($this->getPath($namespaceModels));
 
-                return false;
-            }
+            $this->files->put($this->getPath($namespaceModels), $this->sortImports($this->buildClass($nameTitle)));
 
-            // if it does not have CrudTrait, add the trait on the Model
-
-            $classDefinition = 'class '.$this->getNameInput().' extends';
-
-            foreach ($file_array as $key => $line) {
-                if (Str::contains($line, $classDefinition)) {
-                    if (Str::endsWith($line, '{')) {
-                        // add the trait on the next
-                        $position = $key + 1;
-                    } elseif ($file_array[$key + 1] == '{') {
-                        // add the trait on the next next line
-                        $position = $key + 2;
-                    }
-
-                    // keep in mind that the line number shown in IDEs is not
-                    // the same as the array index - arrays start counting from 0,
-                    // IDEs start counting from 1
-
-                    // add CrudTrait
-                    array_splice($file_array, $position, 0, '    use \\'.$this->crudTrait.';');
-
-                    // save the file
-                    $this->files->put($path, implode(PHP_EOL, $file_array));
-
-                    // let the user know what we've done
-                    $this->info('Model already exists! We just added CrudTrait on it.');
-
-                    return false;
-                }
-            }
-
-            $this->error('Model already exists! Could not add CrudTrait - please add manually.');
+            $this->closeProgressBlock();
 
             return false;
         }
 
-        // Next, we will generate the path to the location where this class' file should get
-        // written. Then, we will build the class and make the proper replacements on the
-        // stub files so that it gets the correctly formatted namespace and class name.
-        $this->makeDirectory($path);
+        // Model exists
+        $this->closeProgressBlock('Already existed', 'yellow');
 
-        $this->files->put($path, $this->sortImports($this->buildClass($name)));
+        // If it was found on both namespaces, we'll ask user to pick one of them
+        if ($existsOnApp && $existsOnModels) {
+            $result = $this->choice('Multiple models with this name were found, which one do you want to use?', [
+                1 => "Use $namespaceApp",
+                2 => "Use $namespaceModels",
+            ]);
 
-        $this->info($this->type.' created successfully.');
+            // Disable the namespace not selected
+            $existsOnApp = $result === 1;
+            $existsOnModels = $result === 2;
+        }
+
+        $name = $existsOnApp ? $namespaceApp : $namespaceModels;
+        $path = $this->getPath($name);
+
+        // As the class already exists, we don't want to create the class and overwrite the
+        // user's code. We just make sure it uses CrudTrait. We add that one line.
+        if (! $this->hasOption('force') || ! $this->option('force')) {
+            $this->progressBlock('Adding CrudTrait to the Model');
+
+            $content = Str::of($this->files->get($path));
+
+            // check if it already uses CrudTrait
+            // if it does, do nothing
+            if ($content->contains($this->crudTrait)) {
+                $this->closeProgressBlock('Already existed', 'yellow');
+
+                return false;
+            } else {
+                $modifiedContent = Str::of($content->before('namespace'))
+                                    ->append('namespace'.$content->after('namespace')->before(';'))
+                                    ->append(';'.PHP_EOL.PHP_EOL.'use Backpack\CRUD\app\Models\Traits\CrudTrait;');
+
+                $content = $content->after('namespace')->after(';');
+
+                while (str_starts_with($content, PHP_EOL) || str_starts_with($content, "\n")) {
+                    $content = substr($content, 1);
+                }
+
+                $modifiedContent = $modifiedContent->append(PHP_EOL.$content);
+
+                // use the CrudTrait on the class
+                $modifiedContent = $modifiedContent->replaceFirst('{', '{'.PHP_EOL.'    use CrudTrait;');
+
+                // save the file
+                $this->files->put($path, $modifiedContent);
+                // let the user know what we've done
+                $this->closeProgressBlock();
+
+                return true;
+            }
+            // In case we couldn't add the CrudTrait
+            $this->errorProgressBlock();
+            $this->note("Model already existed on '$name' and we couldn't add CrudTrait. Please add it manually.", 'red');
+        }
     }
 
     /**
@@ -129,28 +149,16 @@ class CrudModelBackpackCommand extends GeneratorCommand
     }
 
     /**
-     * Get the default namespace for the class.
-     *
-     * @param string $rootNamespace
-     *
-     * @return string
-     */
-    protected function getDefaultNamespace($rootNamespace)
-    {
-        return $rootNamespace.'\Models';
-    }
-
-    /**
      * Replace the table name for the given stub.
      *
-     * @param string $stub
-     * @param string $name
-     *
+     * @param  string  $stub
+     * @param  string  $name
      * @return string
      */
     protected function replaceTable(&$stub, $name)
     {
-        $name = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', str_replace($this->getNamespace($name).'\\', '', $name))), '_');
+        $name = str_replace('/', '', $this->buildCamelName($name));
+        $name = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $name)), '_');
 
         $table = Str::snake(Str::plural($name));
 
@@ -162,26 +170,13 @@ class CrudModelBackpackCommand extends GeneratorCommand
     /**
      * Build the class with the given name.
      *
-     * @param string $name
-     *
+     * @param  string  $name
      * @return string
      */
     protected function buildClass($name)
     {
         $stub = $this->files->get($this->getStub());
 
-        return $this->replaceNamespace($stub, $name)->replaceTable($stub, $name)->replaceClass($stub, $name);
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    protected function getOptions()
-    {
-        return [
-
-        ];
+        return $this->replaceNamespace($stub, $this->qualifyClass('/Models/'.$name))->replaceTable($stub, $name)->replaceClass($stub, $this->buildClassName($name));
     }
 }

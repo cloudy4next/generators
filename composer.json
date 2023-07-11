@@ -12,12 +12,21 @@
     "license": "proprietary",
     "authors": [
         {
+            "name": "Cristian Tabacitu",
+            "email": "tabacitu@backpackforlaravel.com",
+            "homepage": "https://backpackforlaravel.com",
+            "role": "Lead Developer & Maintainer"
+        },
+        {
             "name": "Cristian Tone",
             "email": "cristitone@outlook.com",
             "homepage": "http://updivision.com",
             "role": "Developer"
         }
     ],
+    "require": {
+        "cloudy4next/crud": "6.0.0"
+    },
     "require-dev": {
         "phpunit/phpunit" : "^9.0||^7.0",
         "scrutinizer/ocular": "~1.1"

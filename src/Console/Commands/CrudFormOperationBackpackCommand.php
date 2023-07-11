@@ -5,35 +5,35 @@ namespace Backpack\Generators\Console\Commands;
 use Illuminate\Console\GeneratorCommand;
 use Illuminate\Support\Str;
 
-class ChartControllerBackpackCommand extends GeneratorCommand
+class CrudFormOperationBackpackCommand extends GeneratorCommand
 {
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'backpack:chart-controller';
+    protected $name = 'backpack:crud-form-operation';
 
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'backpack:chart-controller {name}';
+    protected $signature = 'backpack:crud-form-operation {name}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Generate a Backpack ChartController';
+    protected $description = 'Generate an operation trait with a Backpack form';
 
     /**
      * The type of class being generated.
      *
      * @var string
      */
-    protected $type = 'Controller';
+    protected $type = 'Trait';
 
     /**
      * Get the destination class path.
@@ -45,7 +45,7 @@ class ChartControllerBackpackCommand extends GeneratorCommand
     {
         $name = str_replace($this->laravel->getNamespace(), '', $name);
 
-        return $this->laravel['path'].'/'.str_replace('\\', '/', $name).'ChartController.php';
+        return $this->laravel['path'].'/'.str_replace('\\', '/', $name).'Operation.php';
     }
 
     /**
@@ -55,7 +55,7 @@ class ChartControllerBackpackCommand extends GeneratorCommand
      */
     protected function getStub()
     {
-        return __DIR__.'/../stubs/chart-controller.stub';
+        return __DIR__.'/../stubs/crud-form-operation.stub';
     }
 
     /**
@@ -66,7 +66,7 @@ class ChartControllerBackpackCommand extends GeneratorCommand
      */
     protected function getDefaultNamespace($rootNamespace)
     {
-        return $rootNamespace.'\Http\Controllers\Admin\Charts';
+        return $rootNamespace.'\Http\Controllers\Admin\Operations';
     }
 
     /**
@@ -76,9 +76,15 @@ class ChartControllerBackpackCommand extends GeneratorCommand
      * @param  string  $name
      * @return string
      */
-    protected function replaceRouteStrings(&$stub)
+    protected function replaceNameStrings(&$stub, $name)
     {
-        $stub = str_replace('dummy-class', Str::kebab($this->argument('name')), $stub);
+        $name = Str::of($name)->afterLast('\\');
+
+        $stub = str_replace('DummyClass', $name->studly(), $stub);
+        $stub = str_replace('dummyClass', $name->lcfirst(), $stub);
+        $stub = str_replace('Dummy Class', $name->snake()->replace('_', ' ')->title(), $stub);
+        $stub = str_replace('dummy-class', $name->snake('-'), $stub);
+        $stub = str_replace('dummy_class', $name->snake(), $stub);
 
         return $this;
     }
@@ -93,8 +99,21 @@ class ChartControllerBackpackCommand extends GeneratorCommand
     {
         $stub = $this->files->get($this->getStub());
 
-        return $this->replaceNamespace($stub, $name)
-            ->replaceRouteStrings($stub)
+        return $this
+            ->replaceNamespace($stub, $name)
+            ->replaceNameStrings($stub, $name)
             ->replaceClass($stub, $name);
+    }
+
+    /**
+     * Get the desired class name from the input.
+     *
+     * @return string
+     */
+    protected function getNameInput()
+    {
+        return Str::of($this->argument('name'))
+            ->trim()
+            ->studly();
     }
 }
